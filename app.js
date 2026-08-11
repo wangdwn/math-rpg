@@ -31,6 +31,23 @@
   function esc(s) {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
+  // 答案判定：数字答案精确匹配输入中的任一数字；文本答案看包含
+  function checkAnswer(input, answers) {
+    const clean = String(input).replace(/\s/g, '');
+    return answers.some(a => {
+      const s = String(a);
+      if (/^-?\d+(\.\d+)?$/.test(s)) {
+        const nums = (clean.match(/-?\d+(\.\d+)?/g) || []).map(parseFloat);
+        const target = parseFloat(s);
+        return nums.some(n => Math.abs(n - target) < 1e-9);
+      }
+      return (() => {
+        const idx = clean.indexOf(s);
+        if (idx === -1) return false;
+        return clean[idx - 1] !== '不'; // 被「不」否定则不算命中
+      })();
+    });
+  }
   function dungeonById(id) { return dungeons.find(d => d.id === id); }
   function cardById(id) { return cards.find(c => c.id === id); }
   function isCleared(did) { return !!(state.dungeons[did] && state.dungeons[did].cleared); }
@@ -126,7 +143,7 @@
     function submit() {
       const val = input.value.trim();
       if (!val) return;
-      const ok = lv.answers.some(a => val.replace(/\s/g, '').includes(a));
+      const ok = checkAnswer(val, lv.answers);
       if (ok) {
         fb.className = 'feedback right';
         fb.innerHTML = `<div class="fb-title">💥 击败 ${esc(lv.name.replace(/^第.关·/, ''))} 的怪物！</div>${esc(lv.loot)}`;
