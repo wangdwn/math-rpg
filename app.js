@@ -259,8 +259,10 @@
       });
     });
     if (focusCard) {
-      const el = document.getElementById('card-' + focusCard.id);
-      if (el) el.scrollIntoView({ block: 'start' });
+      requestAnimationFrame(() => {
+        const el = document.getElementById('card-' + focusCard.id);
+        if (el) el.scrollIntoView({ block: 'center' });
+      });
     }
   }
 
