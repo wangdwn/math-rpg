@@ -13,6 +13,7 @@
       fetch('data/dungeons.json'),
       fetch('data/cards.json')
     ]);
+    if (!dRes.ok || !cRes.ok) throw new Error('content fetch failed');
     dungeons = (await dRes.json()).dungeons || [];
     cards = (await cRes.json()).cards || [];
   } catch (e) {
@@ -67,7 +68,8 @@
     const hash = location.hash || '#/';
     const m = hash.match(/^#\/dungeon\/([\w-]+)/);
     if (m) return renderDungeon(m[1]);
-    if (hash.startsWith('#/cards')) return renderCards();
+    const cm = hash.match(/^#\/cards(?:\/([\w-]+))?/);
+    if (cm) return renderCards(cm[1] || '');
     renderHome();
   }
 
@@ -191,25 +193,34 @@
         <h2>${cleared ? '再次通关！' : '副本通关！'}</h2>
         <div class="v-text">${esc(d.summary)}</div>
         <button class="btn primary" id="unlockBtn">🔓 解锁 ${d.card_ids.length} 张复习卡</button>
-        <div class="unlock">已解锁：${d.card_ids.map(id => esc((cardById(id) || { title: id }).title)).join('、')}</div>
+        <div class="unlock">已解锁：${d.card_ids.map(id => {
+          const c = cardById(id);
+          const title = esc((c || { title: id }).title);
+          return c ? `<a href="#/cards/${id}">${title}</a>` : title;
+        }).join('、')}</div>
         <div style="margin-top:18px"><a class="back" href="#/">← 回大厅</a></div>
       </div>`;
     document.getElementById('unlockBtn').addEventListener('click', () => {
       d.card_ids.forEach(id => { state.cards[id] = { unlocked: true }; });
       saveState();
-      location.hash = '#/cards';
+      location.hash = d.card_ids[0] ? `#/cards/${d.card_ids[0]}` : '#/cards';
     });
   }
 
   /* ---------- 卡片库 ---------- */
   let cardFilter = '全部';
-  function renderCards() {
+  function renderCards(focusId) {
+    const focusCard = focusId ? cardById(focusId) : null;
+    if (focusCard) cardFilter = '全部';
     const tags = ['全部', ...new Set(cards.map(c => c.tag))];
     const list = cardFilter === '全部' ? cards : cards.filter(c => c.tag === cardFilter);
     let html = '<h1 class="page-title">复习卡片库</h1><p class="sub">点开卡片做自检，卡壳了就回副本重打那一关。</p>';
     html += '<div class="filter-row">' + tags.map(t =>
       `<span class="filter-chip ${t === cardFilter ? 'active' : ''}" data-tag="${esc(t)}">${esc(t)}</span>`).join('') + '</div>';
 
+    if (focusId && !focusCard) {
+      html += `<div class="empty">找不到卡片 ${esc(focusId)}，下面是全部卡片。</div>`;
+    }
     if (!list.length) html += '<div class="empty">这个分类下还没有卡片</div>';
     list.forEach(c => {
       const unlocked = !!(state.cards[c.id] && state.cards[c.id].unlocked);
@@ -220,8 +231,9 @@
           ? `✅ 已通关 <a href="#/dungeon/${d.id}">${esc(d.name)}</a>`
           : `🔒 先打副本 <a href="#/dungeon/${d.id}">${esc(d.name)}</a> 解锁`;
       }).join('<br>');
+      const isFocus = focusCard && c.id === focusCard.id;
       html += `
-        <div class="card card-item" data-cid="${esc(c.id)}">
+        <div class="card card-item${isFocus ? ' open target' : ''}" data-cid="${esc(c.id)}" id="card-${esc(c.id)}">
           <div class="c-top">
             <span class="c-tag">${esc(c.tag)}</span>
             <span class="c-time">${esc(c.time_estimate)}</span>
@@ -241,22 +253,34 @@
       chip.addEventListener('click', () => { cardFilter = chip.dataset.tag; renderCards(); });
     });
     $view.querySelectorAll('.card-item').forEach(item => {
-      item.addEventListener('click', () => item.classList.toggle('open'));
+      item.addEventListener('click', e => {
+        if (e.target.closest('a')) return;
+        item.classList.toggle('open');
+      });
     });
+    if (focusCard) {
+      const el = document.getElementById('card-' + focusCard.id);
+      if (el) el.scrollIntoView({ block: 'start' });
+    }
   }
 
   /* ---------- 导航高亮 + 启动 ---------- */
-  window.addEventListener('hashchange', () => {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  function highlightNav() {
     const h = location.hash || '#/';
-    if (h.startsWith('#/dungeon')) document.querySelectorAll('.nav-btn')[0].classList.add('active');
-    else if (h.startsWith('#/cards')) document.querySelectorAll('.nav-btn')[1].classList.add('active');
-    else document.querySelectorAll('.nav-btn')[0].classList.add('active');
+    document.querySelectorAll('.nav-btn[data-nav]').forEach(b => b.classList.remove('active'));
+    const key = h.startsWith('#/cards') ? 'cards' : 'home';
+    const btn = document.querySelector(`.nav-btn[data-nav="${key}"]`);
+    if (btn) btn.classList.add('active');
+  }
+
+  window.addEventListener('hashchange', () => {
+    highlightNav();
     router();
-    window.scrollTo(0, 0);
+    if (!/^#\/cards\/[\w-]+/.test(location.hash || '')) window.scrollTo(0, 0);
   });
 
   loadState();
   updateBar();
+  highlightNav();
   router();
 })();

@@ -44,7 +44,7 @@
       "topic": "数学·函数",
       "grade": "高一",
       "intro": "函数有脾气：有的对称，有的套娃，有的永远不肯掉到零以下。摸清脾气才能通关。",
-      "card_ids": ["card003", "card028", "card034"],
+      "card_ids": ["card003", "card028", "card033"],
       "levels": [
         {
           "name": "第一关 · 镜像之门",
